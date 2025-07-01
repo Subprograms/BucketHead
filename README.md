@@ -1,6 +1,7 @@
 # BucketHead
 
 **BucketHead** is a Python tool for detecting and exfiltrating from **publicly accessible AWS S3 buckets**. 
+
 It merges MITRE ATT&CK techniques T1530, T1580, T1213.003, and T1552.001 
 It takes either:
 - an exact bucket name, or  
