@@ -16,12 +16,12 @@ def PromptForBucketName() -> str:
     return strBucketName
 
 def PromptForKeywords() -> list[str]:
-    strInput = input("Enter keywords (space-separated, e.g. dev secret test): ")
+    strInput = input("Enter keywords (max 4, space-separated, e.g. dev secret test): ")
     return strInput.strip().lower().split()
 
 def GenerateBucketCombos(aKeywords: list[str]) -> list[str]:
     aCombinations = []
-    for n in range(2, len(aKeywords)+1):
+    for n in range(2, min(len(aKeywords)+1, 5)):
         for aCombo in itertools.permutations(aKeywords, n):
             strJoinedDash = '-'.join(aCombo)
             strJoinedUnderscore = '_'.join(aCombo)
