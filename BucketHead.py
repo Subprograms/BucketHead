@@ -103,16 +103,20 @@ def AttemptExfilFromBucket(strBucketName: str) -> None:
 
 def Main() -> None:
     strMode = PromptForMode()
+
+    strInput = input("Enter scan keywords (space-separated), or press ENTER to use defaults: ").strip()
+    aScanKeywords = strInput.lower().split() if strInput else None
+
     if strMode == "1":
         strBucketName = PromptForBucketName()
-        AttemptExfilFromBucket(strBucketName)
+        AttemptExfilFromBucket(strBucketName, aScanKeywords)
     elif strMode == "2":
         aKeywords = PromptForKeywords()
         nDelaySec = int(input("Enter delay between attempts (in seconds, e.g., 5): ").strip())
         aBucketCombos = GenerateBucketCombos(aKeywords)
         print(f"[INFO] Trying {len(aBucketCombos)} bucket combinations...")
         for strBucketName in aBucketCombos:
-            AttemptExfilFromBucket(strBucketName)
+            AttemptExfilFromBucket(strBucketName, aScanKeywords)
             time.sleep(nDelaySec)
     else:
         print("[ERROR] Invalid choice.")
