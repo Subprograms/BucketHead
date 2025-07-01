@@ -86,11 +86,11 @@ def DownloadS3Object(strBucketName: str, strKey: str, strOutputDir: str) -> None
         print(f"[ERROR] Failed to download {strKey} (HTTP {objResponse.status_code})")
 
 def AttemptExfilFromBucket(strBucketName: str) -> None:
-    print(f"[TRY] {strBucketName}")
+    print(f"[INFO] {strBucketName}")
     bIsPublic, strXMLListing = CheckIfBucketIsPublic(strBucketName)
 
     if not bIsPublic:
-        print(f"[SKIPPED] '{strBucketName}' is not publicly listable or does not exist.")
+        print(f"[ERROR] '{strBucketName}' is not publicly listable or does not exist.")
         return
 
     print(f"[FOUND] '{strBucketName}' is PUBLIC. Proceeding to exfiltrate files...")
@@ -103,7 +103,7 @@ def AttemptExfilFromBucket(strBucketName: str) -> None:
     os.makedirs(strOutputDir, exist_ok=True)
 
     for strFileKey in aFileKeys:
-        print(f" > Found: {strFileKey}")
+        print(f"[FOUND] {strFileKey} is public")
         DownloadS3Object(strBucketName, strFileKey, strOutputDir)
 
     print(f"[INFO] Exfiltration complete. Files saved in: {strOutputDir}")
