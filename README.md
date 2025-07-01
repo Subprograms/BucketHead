@@ -13,7 +13,7 @@ If a bucket is public, it downloads any listed files and scans `.txt` files for 
 
 ---
 
-## ⚙️ Requirements
+## ⚙ Requirements
 
 - Python 3.7+
 - `requests` library
