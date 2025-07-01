@@ -70,7 +70,7 @@ def ScanTextFileForSecrets(strFilePath: str, strOutputDir: str, aCustomKeywords:
     except Exception as e:
         print(f"[ERROR] Failed to scan file '{strFilePath}': {str(e)}")
 
-def DownloadS3Object(strBucketName: str, strKey: str, strOutputDir: str) -> None:
+def DownloadS3Object(strBucketName: str, strKey: str, strOutputDir: str, aScanKeywords: list[str] = None) -> None:
     strFileURL = f"https://{strBucketName}.s3.amazonaws.com/{strKey}"
     strSanitizedFileName = strKey.replace('/', '_')
     strOutputPath = os.path.join(strOutputDir, strSanitizedFileName)
@@ -80,7 +80,7 @@ def DownloadS3Object(strBucketName: str, strKey: str, strOutputDir: str) -> None
             fOutputFile.write(objResponse.content)
         print(f"[INFO] Downloaded: {strKey} -> {strOutputPath}")
         if strOutputPath.lower().endswith(".txt"):
-            ScanTextFileForSecrets(strOutputPath, strOutputDir)
+            ScanTextFileForSecrets(strOutputPath, strOutputDir, aScanKeywords)
     else:
         print(f"[ERROR] Failed to download {strKey} (HTTP {objResponse.status_code})")
 
