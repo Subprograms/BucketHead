@@ -52,8 +52,8 @@ def ParseS3FileKeys(strXMLResponse: str) -> list[str]:
         pass
     return aKeys
 
-def ScanTextFileForSecrets(strFilePath: str, strOutputDir: str) -> None:
-    aKeywords = ["password", "passwd", "secret", "key", "api", "token", "db", "auth"]
+def ScanTextFileForSecrets(strFilePath: str, strOutputDir: str, aCustomKeywords: list[str] = None) -> None:
+    aKeywords = aCustomKeywords if aCustomKeywords else ["password", "passwd", "secret", "key", "api", "token", "db", "auth"]
     strOutFilePath = os.path.join(strOutputDir, "relevant_lines.txt")
     aMatchedLines = []
     try:
